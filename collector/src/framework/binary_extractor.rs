@@ -18,7 +18,7 @@ impl BinaryExtractor {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         println!("Creating temporary directory...");
         
-        let temp_dir = TempDir::new()?;
+        let temp_dir = TempDir::new_in("/var/tmp")?;
         let temp_path = temp_dir.path();
         
         println!("Created temporary directory: {}", temp_path.display());
