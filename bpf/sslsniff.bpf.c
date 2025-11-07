@@ -128,7 +128,7 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
     bpf_get_current_comm(&data->comm, sizeof(data->comm));
 
     if (bufp != 0)
-        ret = bpf_probe_read_user(&data->buf, buf_copy_size, (char *)*bufp);
+        ret = bpf_probe_read_user(&data->buf, buf_copy_size & (MAX_BUF_SIZE-1), (char *)*bufp);
 
     bpf_map_delete_elem(&bufs, &tid);
     bpf_map_delete_elem(&start_ns, &tid);
@@ -241,7 +241,7 @@ static int ex_SSL_exit(struct pt_regs *ctx, int rw, int len) {
     bpf_get_current_comm(&data->comm, sizeof(data->comm));
 
     if (bufp != 0)
-        ret = bpf_probe_read_user(&data->buf, buf_copy_size, (char *)*bufp);
+        ret = bpf_probe_read_user(&data->buf, buf_copy_size & (MAX_BUF_SIZE-1), (char *)*bufp);
 
     bpf_map_delete_elem(&bufs, &tid);
     bpf_map_delete_elem(&start_ns, &tid);
