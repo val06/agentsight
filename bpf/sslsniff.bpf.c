@@ -54,10 +54,13 @@ const volatile uid_t targ_uid = -1;
 static __always_inline bool trace_allowed(u32 uid, u32 pid)
 {
     /* filters */
-    if (targ_pid && targ_pid != pid)
+    if (targ_pid && targ_pid != pid) {
+        bpf_printk("[sslsniff] Filtered out pid=%d (target=%d)", pid, targ_pid);
         return false;
+    }
     if (targ_uid != -1) {
         if (targ_uid != uid) {
+            bpf_printk("[sslsniff] Filtered out uid=%d (target=%d)", uid, targ_uid);
             return false;
         }
     }
@@ -105,13 +108,19 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
     u64 delta_ns = ts - *tsp;
 
     int len = PT_REGS_RC(ctx);
-    if (len <= 0)  // no data
+    if (len <= 0) {  // no data
+        bpf_printk("[sslsniff] SSL_%s: no data (len=%d), pid=%d", rw ? "write" : "read", len, pid);
         return 0;
+    }
+
+    bpf_printk("[sslsniff] SSL_%s: captured %d bytes, pid=%d", rw ? "write" : "read", len, pid);
 
     /* reserve space in ring buffer */
     struct probe_SSL_data_t *data = bpf_ringbuf_reserve(&rb, sizeof(*data), 0);
-    if (!data)
+    if (!data) {
+        bpf_printk("[sslsniff] Failed to reserve ringbuf space");
         return 0;
+    }
 
     data->timestamp_ns = ts;
     data->delta_ns = delta_ns;
@@ -136,13 +145,16 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
     if (!ret) {
         data->buf_filled = 1;
         data->buf_size = buf_copy_size;
+        bpf_printk("[sslsniff] SSL_%s: buf_filled=1, buf_size=%d, total_len=%d", rw ? "write" : "read", buf_copy_size, len);
     } else {
         data->buf_filled = 0;
         data->buf_size = 0;
+        bpf_printk("[sslsniff] SSL_%s: buf_filled=0 (read failed, ret=%d)", rw ? "write" : "read", ret);
     }
 
     /* submit to ring buffer */
     bpf_ringbuf_submit(data, 0);
+    bpf_printk("[sslsniff] SSL_%s: event submitted to ringbuf, pid=%d", rw ? "write" : "read", pid);
     return 0;
 }
 
@@ -218,13 +230,19 @@ static int ex_SSL_exit(struct pt_regs *ctx, int rw, int len) {
         return 0;
     u64 delta_ns = ts - *tsp;
 
-    if (len <= 0)  // no data
+    if (len <= 0) {  // no data
+        bpf_printk("[sslsniff] SSL_%s_ex: no data (len=%d), pid=%d", rw ? "write" : "read", len, pid);
         return 0;
+    }
+
+    bpf_printk("[sslsniff] SSL_%s_ex: captured %d bytes, pid=%d", rw ? "write" : "read", len, pid);
 
     /* reserve space in ring buffer */
     struct probe_SSL_data_t *data = bpf_ringbuf_reserve(&rb, sizeof(*data), 0);
-    if (!data)
+    if (!data) {
+        bpf_printk("[sslsniff] Failed to reserve ringbuf space for _ex");
         return 0;
+    }
 
     data->timestamp_ns = ts;
     data->delta_ns = delta_ns;
